@@ -1,11 +1,13 @@
 package com.plugin;
 
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ProjectFileIndex;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.ReferencesSearch;
-import com.intellij.util.Query;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.uast.*;
 
@@ -20,11 +22,17 @@ public class EmissionSearcher {
 
         PsiClass psiClass = uClass.getJavaPsi();
 
-        Query<PsiReference> query =
-                ReferencesSearch.search(psiClass, GlobalSearchScope.projectScope(psiClass.getProject()));
+        Project project = psiClass.getProject();
+        ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
 
-        for (PsiReference ref : query.findAll()) {
-            PsiElement element = ref.getElement();
+        Collection<PsiReference> all_usage =
+                ReferencesSearch.search(psiClass, GlobalSearchScope.projectScope(psiClass.getProject())).findAll();
+
+        for (PsiReference usage : all_usage) {
+            PsiElement element = usage.getElement();
+            VirtualFile vFile = element.getContainingFile().getVirtualFile();
+
+            if (vFile != null && fileIndex.isInTestSourceContent(vFile)) continue;
 
             UElement uElement = UastContextKt.toUElement(element);
             if (uElement == null) continue;
