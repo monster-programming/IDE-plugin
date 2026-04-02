@@ -61,6 +61,12 @@ public class GoToEmissionEventAction extends AnAction {
                 continue;
             }
 
+            // exclude update
+            String fileName = file.getName();
+            if (fileName.contains("Update")) {
+                continue;
+            }
+
             // exclude imports
             if (PsiTreeUtil.getParentOfType(foundElement, KtImportDirective.class) != null) {
                 continue;
