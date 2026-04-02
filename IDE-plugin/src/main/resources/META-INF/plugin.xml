@@ -37,6 +37,7 @@
         <action id="com.plugin.GoToEmissionEventAction"
                 class="com.plugin.GoToEmissionEventAction" text="Go to emission">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="control alt E"/>
         </action>
     </actions>
 </idea-plugin>
