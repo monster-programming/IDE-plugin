@@ -16,6 +16,7 @@ import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.psi.KtImportDirective;
+import org.jetbrains.kotlin.psi.KtTypeReference;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +59,11 @@ public class GoToEmissionEventAction extends AnAction {
 
             // exclude imports
             if (PsiTreeUtil.getParentOfType(foundElement, KtImportDirective.class) != null) {
+                continue;
+            }
+
+            // exclude type ref
+            if (PsiTreeUtil.getParentOfType(foundElement, KtTypeReference.class) != null) {
                 continue;
             }
 
