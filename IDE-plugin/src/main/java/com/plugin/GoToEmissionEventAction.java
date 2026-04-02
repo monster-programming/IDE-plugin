@@ -1,6 +1,7 @@
 package com.plugin;
 
 import com.intellij.codeInsight.navigation.NavigationUtil;
+import com.intellij.pom.Navigatable;
 import com.intellij.psi.search.searches.ReferencesSearch.SearchParameters;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -82,12 +83,16 @@ public class GoToEmissionEventAction extends AnAction {
         }
 
         // show the result
-        if (emissionPlaces.isEmpty()) return;
-
-        NavigationUtil.getPsiElementPopup(
-                emissionPlaces.toArray(new PsiElement[0]),
-                "Emissions Event (" + emissionPlaces.size() + ")"
-        ).showInBestPositionFor(editor);
+        if (emissionPlaces.size() == 1) {
+            // if only one emission place go there
+            ((Navigatable) emissionPlaces.get(0)).navigate(true);
+        } else {
+            // if multiple places - show a list
+            NavigationUtil.getPsiElementPopup(
+                    emissionPlaces.toArray(new PsiElement[0]),
+                    "Emissions Event (" + emissionPlaces.size() + ")"
+            ).showInBestPositionFor(editor);
+        }
     }
 
     @Override
