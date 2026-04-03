@@ -13,34 +13,29 @@ import java.util.List;
 public class ProcessingSearcher {
 
     public static List<PsiElement> findProcessing(@NotNull UClass uClass, GlobalSearchScope scope) {
-        if (!isCommand(uClass)) return null;
 
         List<PsiElement> targets = new ArrayList<>();
+        if (!isCommand(uClass)) return targets;
         PsiClass classCommand = uClass.getJavaPsi();
 
-        Collection<PsiReference> all_usage = ReferencesSearch.search(classCommand, scope)
-                .findAll();
+        ReferencesSearch.search(classCommand, scope)
+                .forEach(usage -> {
+                    PsiElement element = usage.getElement();
 
-        for(PsiReference usage : all_usage) {
-            PsiElement element = usage.getElement();
+                    UElement uElement = UastContextKt.toUElement(element);
+                    if (uElement == null) return false;
 
-            UElement uElement = UastContextKt.toUElement(element);
-            if (uElement == null) continue;
+                    UClass handlerClass = UastUtils.getParentOfType(uElement, UClass.class);
+                    if (handlerClass != null && isCommandsHandler(handlerClass, classCommand)) {
+                        PsiClass psiHandler = handlerClass.getJavaPsi();
 
-            UClass handlerClass = UastUtils.getParentOfType(uElement, UClass.class);
-            if (handlerClass != null && isCommandsHandler(handlerClass, classCommand)) {
-                PsiClass psiHandler = handlerClass.getJavaPsi();
+                        PsiMethod[] methods = psiHandler.findMethodsByName("handle", false);
 
-                PsiMethod[] methods = psiHandler.findMethodsByName("handle", false);
+                        if (methods.length != 0) targets.add(element);
+                    }
 
-                if (methods.length > 0) {
-                    targets.add(methods[0]);
-                }
-                else {
-                    targets.add(psiHandler);
-                }
-            }
-        }
+                    return true;
+                });
 
         return targets;
     }
