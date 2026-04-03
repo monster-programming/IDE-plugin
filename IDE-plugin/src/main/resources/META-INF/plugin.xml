@@ -39,10 +39,26 @@
                 implementationClass="com.plugin.EmissionLineMarkerProvider"/>
     </extensions>
     <actions>
-        <action id="com.plugin.GoToEmissionEventAction"
-                class="com.plugin.GoToEmissionEventAction" text="Go to emission">
+
+        <action id="Kotea.Emission.Project"
+                class="com.plugin.ProjectEventEmissionAction"
+                text="Find Event Emission in Project">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-            <keyboard-shortcut keymap="$default" first-keystroke="control alt E"/>
+            <keyboard-shortcut first-keystroke="control alt P" keymap="$default"/>
+        </action>
+
+        <action id="Kotea.Emission.Module"
+                class="com.plugin.ModuleEventEmissionAction"
+                text="Find Event Emission in Module">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut first-keystroke="control alt M" keymap="$default"/>
+        </action>
+
+        <action id="Kotea.Emission.Test"
+                class="com.plugin.TestEventEmissionAction"
+                text="Find Event Emission in Test">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut first-keystroke="control alt T" keymap="$default"/>
         </action>
     </actions>
 </idea-plugin>

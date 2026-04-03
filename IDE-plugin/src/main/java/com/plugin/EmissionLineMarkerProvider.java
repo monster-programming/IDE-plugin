@@ -4,11 +4,13 @@ import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider;
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder;
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.util.NotNullLazyValue;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.impl.source.tree.LeafPsiElement;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
-import groovyjarjarantlr4.v4.runtime.misc.NotNull;
-import groovyjarjarantlr4.v4.runtime.misc.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.psi.*;
 import com.intellij.psi.PsiReference;
 
@@ -25,16 +27,14 @@ public class EmissionLineMarkerProvider extends RelatedItemLineMarkerProvider {
         if (!(element instanceof LeafPsiElement)) return;
 
         KtClassOrObject targetClass = tryResolveToClass(element);
-        if (targetClass == null) return;
+        if (targetClass == null || !isEventClass(targetClass)) return;
 
-        if (!isEventClass(targetClass)) return;
-
-        List<PsiElement> targets = EventEmissionSearcher.findEmissions(targetClass);
-        if (targets.isEmpty()) return;
+        GlobalSearchScope scope = ScopeBuilder.getProductionScope(element);
 
         NavigationGutterIconBuilder<PsiElement> builder =
                 NavigationGutterIconBuilder.create(AllIcons.Actions.Find)
-                        .setTargets(targets)
+                        .setTargets(NotNullLazyValue.lazy(() ->
+                                EventEmissionSearcher.findEmissions(targetClass, scope)))
                         .setTooltipText("Go to emission");
 
         result.add(builder.createLineMarkerInfo(element));

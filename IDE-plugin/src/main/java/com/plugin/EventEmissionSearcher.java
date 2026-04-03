@@ -9,7 +9,7 @@ import com.intellij.psi.PsiReference;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
-import groovyjarjarantlr4.v4.runtime.misc.NotNull;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.psi.KtClassOrObject;
 import org.jetbrains.kotlin.psi.KtImportDirective;
 import org.jetbrains.kotlin.psi.KtTypeReference;
@@ -19,26 +19,14 @@ import java.util.List;
 
 
 public class EventEmissionSearcher {
-    public static List<PsiElement> findEmissions(@NotNull KtClassOrObject target) {
-        Project project = target.getProject();
+    public static List<PsiElement> findEmissions(@NotNull KtClassOrObject target, @NotNull GlobalSearchScope scope) {
         List<PsiElement> emissionPlaces = new ArrayList<>();
-        ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
 
-        for (PsiReference ref : ReferencesSearch.search(target, GlobalSearchScope.projectScope(project), true).findAll()) {
+        for (PsiReference ref : ReferencesSearch.search(target, scope, false).findAll()) {
             PsiElement el = ref.getElement();
             VirtualFile file = el.getContainingFile().getVirtualFile();
 
             if (file == null) continue;
-
-            // find in source files only
-            if (!fileIndex.isInSource(file)) continue;
-
-            // exclude tests
-            if (fileIndex.isInTestSourceContent(file)) continue;
-            String filePath = file.getPath();
-            if (filePath.contains("/test/")) {
-                continue;
-            }
 
             // exclude update
             String fileName = file.getName();
