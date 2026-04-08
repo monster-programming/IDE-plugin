@@ -35,12 +35,9 @@ public class BaseAction extends AnAction {
         return "";
     }
 
-    private Map<String, GlobalSearchScope> scopeMap;
-
     private Map<String, GlobalSearchScope> buildScope(PsiElement e) {
-        if (scopeMap != null) return scopeMap;
+        Map<String, GlobalSearchScope> scopeMap = new HashMap<>();
 
-        scopeMap = new HashMap<>();
         scopeMap.put("Production", ScopeBuilder.getProductionScope(e));
         scopeMap.put("Test", ScopeBuilder.getTestScope(e));
         scopeMap.put("Module", ScopeBuilder.getModuleScope(e));
