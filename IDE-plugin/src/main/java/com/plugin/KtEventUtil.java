@@ -12,43 +12,28 @@ public class KtEventUtil {
         String name = ktClass.getName();
         if (name == null || name.endsWith("Update") || name.endsWith("Handler")) return false;
         if (name.endsWith("Event")) return true;
-        if (ktClass.getSuperTypeList() != null) {
-            String cleanSuperType = ktClass.getSuperTypeList().getText().replaceAll("<.*?>", "");
-            return cleanSuperType.contains("Event");
-        }
-        KtClassOrObject parentClass = PsiTreeUtil.getParentOfType(ktClass, KtClassOrObject.class);
-        if (parentClass != null) {
-            String parentName = parentClass.getName();
-            if (parentName != null && parentName.endsWith("Event")) return true;
-        }
-        return false;
+
+        KtSuperTypeList superTypeList = ktClass.getSuperTypeList();
+        if (superTypeList != null && superTypeList.getText().contains("Event")) return true;
+
+        KtClassOrObject parent = PsiTreeUtil.getParentOfType(ktClass, KtClassOrObject.class);
+        return parent != null && parent.getName() != null && parent.getName().endsWith("Event");
     }
 
     @Nullable
     public static KtClassOrObject tryResolveToClass(PsiElement element) {
-        if (element == null) return null;
-
-        if (element instanceof KtClassOrObject) return (KtClassOrObject) element;
-
-        if (PsiTreeUtil.getParentOfType(element, KtImportDirective.class) != null) return null;
+        if (element instanceof KtClassOrObject cls) return cls;
+        if (element == null || PsiTreeUtil.getParentOfType(element, KtImportDirective.class) != null) return null;
 
         PsiElement parent = element.getParent();
+        if (parent instanceof KtClassOrObject cls && element == cls.getNameIdentifier()) return cls;
 
-        if (parent instanceof KtClassOrObject && element == ((KtClassOrObject) parent).getNameIdentifier()) {
-            return (KtClassOrObject) parent;
-        }
-
-        if (parent instanceof KtReferenceExpression) {
-            KtReferenceExpression ref = (KtReferenceExpression) parent;
-
+        if (parent instanceof KtReferenceExpression ref) {
             PsiReference reference = ref.getReference();
             PsiElement resolved = reference != null ? reference.resolve() : null;
-
-            if (resolved instanceof KtClassOrObject) return (KtClassOrObject) resolved;
-
-            if (resolved instanceof KtConstructor) {
-                return ((KtConstructor<?>) resolved).getContainingClassOrObject();
-            }
+            if (resolved instanceof KtClassOrObject cls) return cls;
+            if (resolved instanceof KtConstructor<?> constructor)
+                return constructor.getContainingClassOrObject();
         }
 
         return null;
