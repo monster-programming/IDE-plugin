@@ -1,6 +1,7 @@
 package com.plugin;
 
 import com.intellij.codeInsight.navigation.NavigationUtil;
+import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
@@ -23,9 +24,11 @@ import java.util.Map;
 
 public class BaseAction extends AnAction {
 
-    protected List<PsiElement> findTargets(UClass targetClass, GlobalSearchScope scope) {
+    protected List<PsiElement> findTargets(PsiElement targetClass, GlobalSearchScope scope) {
         return null;
     }
+
+    protected PsiElement findTargetClass(PsiElement element) {return null;}
 
     protected String getTitle() {
         return " ";
@@ -55,7 +58,7 @@ public class BaseAction extends AnAction {
         Editor editor = e.getData(CommonDataKeys.EDITOR);
         if (editor == null || element == null) return;
 
-        UClass targetClass = findTargetClass(element);
+        PsiElement targetClass = findTargetClass(element);
 
         if (targetClass == null) return;
 
@@ -63,7 +66,7 @@ public class BaseAction extends AnAction {
 
     }
 
-    private void showScopePopup(Editor e, UClass targetClass, PsiElement element) {
+    private void showScopePopup(Editor e, PsiElement targetClass, PsiElement element) {
         String[] scopes = buildScope(element).keySet().toArray(new String[0]);
 
         JBPopupFactory.getInstance()
@@ -78,22 +81,7 @@ public class BaseAction extends AnAction {
                 }).showInBestPositionFor(e);
     }
 
-    private UClass findTargetClass(PsiElement element) {
-        UElement uElement = UastContextKt.toUElement(element);
-
-        UClass uClass = null;
-        if (uElement instanceof UMethod && ((UMethod) uElement).isConstructor()) {
-            uClass = UastUtils.getParentOfType(uElement, UClass.class);
-        }
-
-        if (uClass == null) {
-            uClass = UastUtils.getParentOfType(uElement, UClass.class, false);
-        }
-
-        return uClass;
-    }
-
-    private void executeSearch(Editor e, UClass targetClass, GlobalSearchScope scope) {
+    private void executeSearch(Editor e, PsiElement targetClass, GlobalSearchScope scope) {
         List<PsiElement> targets = findTargets(targetClass, scope);
 
         if (targets.isEmpty()) return;
@@ -105,5 +93,10 @@ public class BaseAction extends AnAction {
             NavigationUtil.getPsiElementPopup(targets.toArray(new PsiElement[0]), getTitle())
                     .showInBestPositionFor(e);
         }
+    }
+
+    @Override
+    public @NotNull ActionUpdateThread getActionUpdateThread() {
+        return ActionUpdateThread.BGT;
     }
 }
