@@ -22,20 +22,51 @@ public class KtEventUtil {
 
     @Nullable
     public static KtClassOrObject tryResolveToClass(PsiElement element) {
-        if (element instanceof KtClassOrObject cls) return cls;
-        if (element == null || PsiTreeUtil.getParentOfType(element, KtImportDirective.class) != null) return null;
+        if (element == null) return null;
 
-        PsiElement parent = element.getParent();
-        if (parent instanceof KtClassOrObject cls && element == cls.getNameIdentifier()) return cls;
+        KtClassOrObject result = null;
 
-        if (parent instanceof KtReferenceExpression ref) {
-            PsiReference reference = ref.getReference();
-            PsiElement resolved = reference != null ? reference.resolve() : null;
-            if (resolved instanceof KtClassOrObject cls) return cls;
-            if (resolved instanceof KtConstructor<?> constructor)
-                return constructor.getContainingClassOrObject();
+        PsiElement source = element.getNavigationElement();
+
+        if (source instanceof KtClassOrObject cls) {
+            result = cls;
         }
+        else if (source instanceof KtConstructor<?> constructor) {
+            result = constructor.getContainingClassOrObject();
+        }
+        else {
+            if (PsiTreeUtil.getParentOfType(source, KtImportDirective.class) != null) return null;
 
+            PsiElement parent = source.getParent();
+            if (parent instanceof KtClassOrObject cls && source == cls.getNameIdentifier()) {
+                result = cls;
+            } else {
+                KtReferenceExpression ref = null;
+                if (source instanceof KtReferenceExpression) {
+                    ref = (KtReferenceExpression) source;
+                } else if (parent instanceof KtReferenceExpression) {
+                    ref = (KtReferenceExpression) parent;
+                }
+
+                if (ref != null) {
+                    PsiReference reference = ref.getReference();
+                    PsiElement resolved = reference != null ? reference.resolve() : null;
+
+                    if (resolved != null) {
+                        PsiElement resolvedSource = resolved.getNavigationElement();
+
+                        if (resolvedSource instanceof KtClassOrObject cls) {
+                            result = cls;
+                        } else if (resolvedSource instanceof KtConstructor<?> constructor) {
+                            result = constructor.getContainingClassOrObject();
+                        }
+                    }
+                }
+            }
+        }
+        if (result != null && isEventClass(result)) {
+            return result;
+        }
         return null;
     }
 }

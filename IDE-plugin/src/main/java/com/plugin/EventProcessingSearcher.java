@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.psi.KtClassOrObject;
 import org.jetbrains.kotlin.psi.KtImportDirective;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.PsiModificationTracker;
+import org.jetbrains.kotlin.psi.KtParameter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +42,7 @@ public class EventProcessingSearcher {
             if (!file.getName().contains("Update")) continue;
 
             if (PsiTreeUtil.getParentOfType(el, KtImportDirective.class) != null) continue;
+            if (PsiTreeUtil.getParentOfType(el, KtParameter.class) != null) continue;
 
             results.add(el);
         }
