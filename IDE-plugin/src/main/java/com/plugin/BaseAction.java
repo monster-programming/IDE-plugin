@@ -1,10 +1,14 @@
 package com.plugin;
 
+import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.codeInsight.navigation.NavigationUtil;
+import com.intellij.codeInsight.navigation.PsiTargetNavigator;
+import com.intellij.codeInsight.navigation.impl.PsiTargetPresentationRenderer;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
 
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
@@ -62,8 +66,8 @@ public class BaseAction extends AnAction {
 
         if (targetClass == null) return;
 
-        showScopePopup(editor, targetClass, element);
-
+        GlobalSearchScope scope = ScopeBuilder.getProductionScope(element);
+        executeSearch(editor, targetClass, scope);
     }
 
     private void showScopePopup(Editor e, PsiElement targetClass, PsiElement element) {
@@ -84,13 +88,19 @@ public class BaseAction extends AnAction {
     private void executeSearch(Editor e, PsiElement targetClass, GlobalSearchScope scope) {
         List<PsiElement> targets = findTargets(targetClass, scope);
 
-        if (targets.isEmpty()) return;
+        if (targets.isEmpty()) {
+            String message = "No " + getOperation().toLowerCase() + " usages found.";
+            HintManager.getInstance().showInformationHint(e, message);
+            return;
+        }
 
         if (targets.size() == 1) {
             ((Navigatable) targets.getFirst()).navigate(true);
         }
         else {
-            NavigationUtil.getPsiElementPopup(targets.toArray(new PsiElement[0]), getTitle())
+            new PsiTargetNavigator<>(targets)
+                    .presentationProvider(ContextPresentationProvider::getPresentation)
+                    .createPopup(e.getProject(), getTitle())
                     .showInBestPositionFor(e);
         }
     }

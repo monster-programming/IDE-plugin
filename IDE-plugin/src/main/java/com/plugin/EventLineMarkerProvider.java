@@ -3,8 +3,10 @@ package com.plugin;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider;
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder;
+import com.intellij.codeInsight.navigation.impl.PsiTargetPresentationRenderer;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.util.NotNullLazyValue;
+import com.intellij.platform.backend.presentation.TargetPresentation;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.impl.source.tree.LeafPsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -29,8 +31,14 @@ public class EventLineMarkerProvider extends RelatedItemLineMarkerProvider {
         if (parent instanceof KtNameReferenceExpression) {
             PsiElement grandParent = parent.getParent();
             if (grandParent instanceof KtDotQualifiedExpression && ((KtDotQualifiedExpression) grandParent).getReceiverExpression() == parent) return;
-            if (grandParent instanceof KtUserType && ((KtUserType) grandParent).getQualifier() == parent) return;
+
+            if (grandParent instanceof KtUserType) {
+                PsiElement greatGrandParent = grandParent.getParent();
+                if (greatGrandParent instanceof KtUserType && ((KtUserType) greatGrandParent).getQualifier() == grandParent) return;
+            }
         }
+
+        if (PsiTreeUtil.getParentOfType(element, KtSuperTypeList.class) != null) return;
 
         KtClassOrObject targetClass = KtEventUtil.tryResolveToClass(element);
 
@@ -38,18 +46,37 @@ public class EventLineMarkerProvider extends RelatedItemLineMarkerProvider {
 
         GlobalSearchScope scope = ScopeBuilder.getProductionScope(element);
 
-        result.add(NavigationGutterIconBuilder.create(AllIcons.Actions.Find)
-                .setTargets(NotNullLazyValue.lazy(() ->
-                        EventEmissionSearcher.findEmissions(targetClass, scope)))
-                .setTooltipText("Go to emission")
-                .createLineMarkerInfo(element));
-
+        boolean isDeclaration = element.getParent() == targetClass;
         boolean isInsideUpdateFile = element.getContainingFile().getName().contains("Update");
-        if (!isInsideUpdateFile) {
+
+        if (isDeclaration || isInsideUpdateFile) {
+            result.add(NavigationGutterIconBuilder.create(AllIcons.Actions.Find)
+                    .setTargets(NotNullLazyValue.lazy(() ->
+                            EventEmissionSearcher.findEmissions(targetClass, scope)))
+                    .setTooltipText("Go to emission")
+                    .setEmptyPopupText("No emissions found")
+                    .setTargetRenderer(() -> new PsiTargetPresentationRenderer<PsiElement>() {
+                        @Override
+                        public TargetPresentation getPresentation(@NotNull PsiElement element) {
+                            return ContextPresentationProvider.getPresentation(element);
+                        }
+                    })
+                    .createLineMarkerInfo(element));
+        }
+
+
+        if (!isInsideUpdateFile || isDeclaration) {
             result.add(NavigationGutterIconBuilder.create(AllIcons.Actions.Execute)
                     .setTargets(NotNullLazyValue.lazy(() ->
                             EventProcessingSearcher.findProcessing(targetClass, scope)))
                     .setTooltipText("Go to processing")
+                    .setEmptyPopupText("No processing found")
+                    .setTargetRenderer(() -> new PsiTargetPresentationRenderer<PsiElement>() {
+                        @Override
+                        public TargetPresentation getPresentation(@NotNull PsiElement element) {
+                            return ContextPresentationProvider.getPresentation(element);
+                        }
+                    })
                     .createLineMarkerInfo(element));
         }
     }

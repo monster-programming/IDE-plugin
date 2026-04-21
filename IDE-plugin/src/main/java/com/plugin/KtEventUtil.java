@@ -4,12 +4,20 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.psi.*;
 
 public class KtEventUtil {
 
     public static boolean isEventClass(KtClassOrObject ktClass) {
         String name = ktClass.getName();
+        if (ktClass instanceof KtClass cls) {
+            if (cls.isInterface() ||
+                    cls.hasModifier(KtTokens.ABSTRACT_KEYWORD) ||
+                    cls.hasModifier(KtTokens.SEALED_KEYWORD)) {
+                return false;
+            }
+        }
         if (name == null || name.endsWith("Update") || name.endsWith("Handler")) return false;
         if (name.endsWith("Event")) return true;
 
