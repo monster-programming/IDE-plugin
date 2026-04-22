@@ -189,7 +189,7 @@ public class LineMarkerProviderCommand extends RelatedItemLineMarkerProvider {
     private void showScopePopup(Editor e, PsiElement targetClass, PsiElement element, String title, BiFunction<UClass, GlobalSearchScope, List<PsiElement>> searchFunc, RelativePoint point) {
         String[] scopes = buildScope(element).keySet().toArray(new String[0]);
 
-        JBPopupFactory.getInstance()
+        JBPopup popup = JBPopupFactory.getInstance()
                 .createListPopup(new BaseListPopupStep<String>("Select Search Scope for " + title , scopes) {
                     @Override
                     public @Nullable PopupStep<?> onChosen(String selectedValue, boolean finalChoice) {
@@ -200,7 +200,8 @@ public class LineMarkerProviderCommand extends RelatedItemLineMarkerProvider {
                             navigation(e, targets, "Go to " + title, point);
                         });
                     }
-                }).showInBestPositionFor(e);
+                });
+        popup.show(point);
     }
 
     private void navigation(Editor e, List<PsiElement> targets, String title, RelativePoint point) {
