@@ -5,6 +5,7 @@ import com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.uast.*;
 
 import java.util.List;
+import java.util.Map;
 
 public class ProcessingAction extends BaseAction {
     @Override
@@ -18,12 +19,22 @@ public class ProcessingAction extends BaseAction {
 
     @Override
     protected String getTitle() {
-        return "Processing Command";
+        return "Command Processing";
     }
 
     @Override
     protected String getOperation() {
         return "Processing";
+    }
+
+    @Override
+    protected void createLog(String className, int sizeSearch) {
+        AnalyticsService.log("hot-key", Map.of(
+                "type", "Command",
+                "feature", "Go to Processing",
+                "name", className,
+                "size search", sizeSearch
+        ));
     }
 
     @Override

@@ -41,20 +41,7 @@ public class BaseAction extends AnAction {
     protected String getOperation() {
         return "";
     }
-
-    private Map<String, GlobalSearchScope> buildScope(PsiElement e) {
-        Map<String, GlobalSearchScope> scopeMap = new HashMap<>();
-
-        scopeMap.put("Production", ScopeBuilder.getProductionScope(e));
-        scopeMap.put("Test", ScopeBuilder.getTestScope(e));
-        scopeMap.put("Module", ScopeBuilder.getModuleScope(e));
-
-        return scopeMap;
-    }
-
-    private GlobalSearchScope getScope(PsiElement e, String name) {
-        return buildScope(e).get(name);
-    }
+    protected void createLog(String className, int sizeSearch) {}
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
@@ -70,23 +57,10 @@ public class BaseAction extends AnAction {
         executeSearch(editor, targetClass, scope);
     }
 
-    private void showScopePopup(Editor e, PsiElement targetClass, PsiElement element) {
-        String[] scopes = buildScope(element).keySet().toArray(new String[0]);
-
-        JBPopupFactory.getInstance()
-                .createListPopup(new BaseListPopupStep<String>("Select Search Scope for " + getOperation(), scopes) {
-                    @Override
-                    public @Nullable PopupStep<?> onChosen(String selectedValue, boolean finalChoice) {
-                        return doFinalStep(() -> {
-                                GlobalSearchScope scope = getScope(element, selectedValue);
-                                executeSearch(e, targetClass, scope);
-                        });
-                    }
-                }).showInBestPositionFor(e);
-    }
-
     private void executeSearch(Editor e, PsiElement targetClass, GlobalSearchScope scope) {
         List<PsiElement> targets = findTargets(targetClass, scope);
+
+        createLog(targetClass.getText(), targets.size());
 
         if (targets.isEmpty()) {
             String message = "No " + getOperation().toLowerCase() + " usages found.";
@@ -104,6 +78,7 @@ public class BaseAction extends AnAction {
                     .showInBestPositionFor(e);
         }
     }
+
 
     @Override
     public @NotNull ActionUpdateThread getActionUpdateThread() {
