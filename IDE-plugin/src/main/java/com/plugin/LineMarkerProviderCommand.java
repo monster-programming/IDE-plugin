@@ -8,10 +8,13 @@ import com.intellij.icons.AllIcons;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.ui.MessageType;
+import com.intellij.openapi.ui.popup.Balloon;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.ui.popup.PopupStep;
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
@@ -28,6 +31,20 @@ import java.util.Map;
 import java.util.function.BiFunction;
 
 public class LineMarkerProviderCommand extends RelatedItemLineMarkerProvider {
+
+    private Map<String, GlobalSearchScope> buildScope(PsiElement e) {
+        Map<String, GlobalSearchScope> scopeMap = new HashMap<>();
+
+        scopeMap.put("Production", ScopeBuilder.getProductionScope(e));
+        scopeMap.put("Test", ScopeBuilder.getTestScope(e));
+        scopeMap.put("Module", ScopeBuilder.getModuleScope(e));
+
+        return scopeMap;
+    }
+
+    private GlobalSearchScope getScope(PsiElement e, String name) {
+        return buildScope(e).get(name);
+    }
 
     @Override
     protected void collectNavigationMarkers(@NotNull PsiElement element,
@@ -52,10 +69,10 @@ public class LineMarkerProviderCommand extends RelatedItemLineMarkerProvider {
             PsiElement identifier = psiClass.getNameIdentifier();
             if (identifier == null) identifier = element;
 
-           RelatedItemLineMarkerInfo<PsiElement> emissionMarker = getMarker(identifier, psiClass, PluginIcons.EMISSION, "Emission", EmissionSearcher::findEmission);
+           RelatedItemLineMarkerInfo<PsiElement> emissionMarker = getMarker(identifier, psiClass, IconClass.goToEmission, " Go to Emission", EmissionSearcher::findEmission);
            result.add(emissionMarker);
 
-           RelatedItemLineMarkerInfo<PsiElement> processingMarker = getMarker(identifier, psiClass, PluginIcons.PROCESSING, "Processing", ProcessingSearcher::findProcessing);
+           RelatedItemLineMarkerInfo<PsiElement> processingMarker = getMarker(identifier, psiClass, IconClass.goToProcessing, "Go to Processing", ProcessingSearcher::findProcessing);
            result.add(processingMarker);
         }
     }
@@ -127,11 +144,62 @@ public class LineMarkerProviderCommand extends RelatedItemLineMarkerProvider {
                 element,
                 element.getTextRange(),
                 icon,
-                elt -> "Go to " + title,
+                elt -> title,
                 navHandler,
                 GutterIconRenderer.Alignment.CENTER,
                 () -> List.of()
         );
+    }
+
+    private void showScopePopup(Editor e, PsiElement targetClass, PsiElement element, String title, BiFunction<UClass, GlobalSearchScope, List<PsiElement>> searchFunc, RelativePoint point) {
+        String[] scopes = buildScope(element).keySet().toArray(new String[0]);
+
+        JBPopup popup = JBPopupFactory.getInstance()
+                .createListPopup(new BaseListPopupStep<String>("Select Search Scope for " + title , scopes) {
+                    @Override
+                    public @Nullable PopupStep<?> onChosen(String selectedValue, boolean finalChoice) {
+                        return doFinalStep(() -> {
+                            GlobalSearchScope scope = getScope(element, selectedValue);
+                            UClass uClass = UastContextKt.toUElement(targetClass, UClass.class);
+                            List<PsiElement> targets = searchFunc.apply(uClass, scope);
+
+                            createLog(title, element.getText(), selectedValue, targets.size());
+
+                            navigation(e, targets, title, point);
+                        });
+                    }
+                });
+        popup.show(point);
+    }
+
+    private void navigation(Editor e, List<PsiElement> targets, String title, RelativePoint point) {
+        if (targets.isEmpty()) {
+//            HintManager.getInstance().showInformationHint(e, "Not found for " + title);
+            JBPopupFactory.getInstance()
+                    .createHtmlTextBalloonBuilder("Not found for " + title, MessageType.INFO, null)
+                    .setFadeoutTime(3000) // Исчезнет через 3 секунды
+                    .createBalloon()
+                    .show(point, Balloon.Position.atRight);
+            return;
+        }
+
+        if (targets.size() == 1) {
+            ((Navigatable) targets.getFirst()).navigate(true);
+        }
+        else {
+            JBPopup popup = JBPopupFactory.getInstance()
+                    .createPopupChooserBuilder(targets)
+                    .setTitle(title)
+                    .setRenderer(ContextPresentationProvider.createCellRender())
+                    .setItemChosenCallback(target -> {
+                        if (target instanceof Navigatable navigatable) {
+                            navigatable.navigate(true);
+                        }
+                    })
+                    .createPopup();
+
+            popup.show(point);
+        }
     }
 
     private boolean isCommand(PsiClass psiClass) {
@@ -173,59 +241,14 @@ public class LineMarkerProviderCommand extends RelatedItemLineMarkerProvider {
         return false;
     }
 
-    private Map<String, GlobalSearchScope> buildScope(PsiElement e) {
-        Map<String, GlobalSearchScope> scopeMap = new HashMap<>();
-
-        scopeMap.put("Production", ScopeBuilder.getProductionScope(e));
-        scopeMap.put("Test", ScopeBuilder.getTestScope(e));
-        scopeMap.put("Module", ScopeBuilder.getModuleScope(e));
-
-        return scopeMap;
-    }
-
-    private GlobalSearchScope getScope(PsiElement e, String name) {
-        return buildScope(e).get(name);
-    }
-    private void showScopePopup(Editor e, PsiElement targetClass, PsiElement element, String title, BiFunction<UClass, GlobalSearchScope, List<PsiElement>> searchFunc, RelativePoint point) {
-        String[] scopes = buildScope(element).keySet().toArray(new String[0]);
-
-        JBPopup popup = JBPopupFactory.getInstance()
-                .createListPopup(new BaseListPopupStep<String>("Select Search Scope for " + title , scopes) {
-                    @Override
-                    public @Nullable PopupStep<?> onChosen(String selectedValue, boolean finalChoice) {
-                        return doFinalStep(() -> {
-                            GlobalSearchScope scope = getScope(element, selectedValue);
-                            UClass uClass = UastContextKt.toUElement(targetClass, UClass.class);
-                            List<PsiElement> targets = searchFunc.apply(uClass, scope);
-                            navigation(e, targets, "Go to " + title, point);
-                        });
-                    }
-                });
-        popup.show(point);
-    }
-
-    private void navigation(Editor e, List<PsiElement> targets, String title, RelativePoint point) {
-        if (targets.isEmpty()) {
-            HintManager.getInstance().showInformationHint(e, "Not found for " + title);
-            return;
-        }
-
-        if (targets.size() == 1) {
-            ((Navigatable) targets.getFirst()).navigate(true);
-        }
-        else {
-            JBPopup popup = JBPopupFactory.getInstance()
-                    .createPopupChooserBuilder(targets)
-                    .setTitle(title)
-                    .setRenderer(ContextPresentationProvider.createCellRender())
-                    .setItemChosenCallback(target -> {
-                        if (target instanceof Navigatable navigatable) {
-                            navigatable.navigate(true);
-                        }
-                    })
-                    .createPopup();
-
-            popup.show(point);
-        }
+    private void createLog(String title, String className, String scope, int sizeSearch) {
+       AnalyticsService.log("gutter-icon", Map.of(
+                "type", "Command",
+                "feature", title,
+                "name", className,
+                "scope search", scope,
+                "size search", sizeSearch
+        ));
+        System.out.println("DEBUG: Trying to log event for " + className);
     }
 }
