@@ -52,10 +52,10 @@ public class LineMarkerProviderCommand extends RelatedItemLineMarkerProvider {
             PsiElement identifier = psiClass.getNameIdentifier();
             if (identifier == null) identifier = element;
 
-           RelatedItemLineMarkerInfo<PsiElement> emissionMarker = getMarker(identifier, psiClass, AllIcons.Actions.Find, "Emission", EmissionSearcher::findEmission);
+           RelatedItemLineMarkerInfo<PsiElement> emissionMarker = getMarker(identifier, psiClass, PluginIcons.EMISSION, "Emission", EmissionSearcher::findEmission);
            result.add(emissionMarker);
 
-           RelatedItemLineMarkerInfo<PsiElement> processingMarker = getMarker(identifier, psiClass, AllIcons.Actions.Execute, "Processing", ProcessingSearcher::findProcessing);
+           RelatedItemLineMarkerInfo<PsiElement> processingMarker = getMarker(identifier, psiClass, PluginIcons.PROCESSING, "Processing", ProcessingSearcher::findProcessing);
            result.add(processingMarker);
         }
     }
@@ -69,7 +69,7 @@ public class LineMarkerProviderCommand extends RelatedItemLineMarkerProvider {
             if (constructedClass != null && isCommand(constructedClass)) {
                 UClass uCommand = UastContextKt.toUElement(constructedClass, UClass.class);
                 if (uCommand != null) {
-                    RelatedItemLineMarkerInfo<PsiElement> marker = getMarker(element, constructedClass, AllIcons.Actions.Execute, "Processing", ProcessingSearcher::findProcessing);
+                    RelatedItemLineMarkerInfo<PsiElement> marker = getMarker(element, constructedClass, PluginIcons.PROCESSING, "Processing", ProcessingSearcher::findProcessing);
                     result.add(marker);
                 }
             }
@@ -87,7 +87,7 @@ public class LineMarkerProviderCommand extends RelatedItemLineMarkerProvider {
                 if (call.getValueArguments().contains(uElement) || call.getValueArguments().contains(parent)) {
                     PsiElement res = ref.resolve();
                     if (res instanceof PsiClass psiClass && isCommand(psiClass)) {
-                        RelatedItemLineMarkerInfo<PsiElement> marker = getMarker(element, psiClass, AllIcons.Actions.Execute, "Processing", ProcessingSearcher::findProcessing);
+                        RelatedItemLineMarkerInfo<PsiElement> marker = getMarker(element, psiClass, PluginIcons.PROCESSING, "Processing", ProcessingSearcher::findProcessing);
                         result.add(marker);
                     }
                 }
@@ -109,7 +109,7 @@ public class LineMarkerProviderCommand extends RelatedItemLineMarkerProvider {
         if (!isCommandsHandler(uCommand, targetCommand)) return;
 
 
-        RelatedItemLineMarkerInfo<PsiElement> marker = getMarker(element, targetCommand, AllIcons.Actions.Find, "Emission", EmissionSearcher::findEmission);
+        RelatedItemLineMarkerInfo<PsiElement> marker = getMarker(element, targetCommand, PluginIcons.EMISSION, "Emission", EmissionSearcher::findEmission);
 
         result.add(marker);
     }
