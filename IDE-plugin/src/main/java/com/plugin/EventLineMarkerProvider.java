@@ -1,16 +1,28 @@
 package com.plugin;
 
+import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider;
+import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder;
+import com.intellij.codeInsight.navigation.PsiTargetNavigator;
 import com.intellij.codeInsight.navigation.impl.PsiTargetPresentationRenderer;
 import com.intellij.icons.AllIcons;
+import javax.swing.Icon;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.markup.GutterIconRenderer;
+import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.openapi.ui.popup.PopupStep;
+import com.intellij.openapi.ui.popup.util.BaseListPopupStep;
 import com.intellij.openapi.util.NotNullLazyValue;
 import com.intellij.platform.backend.presentation.TargetPresentation;
+import com.intellij.pom.Navigatable;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.impl.source.tree.LeafPsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.ui.awt.RelativePoint;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.psi.*;
@@ -18,6 +30,10 @@ import com.intellij.psi.PsiReference;
 
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiFunction;
 
 public class EventLineMarkerProvider extends RelatedItemLineMarkerProvider {
 
@@ -50,34 +66,61 @@ public class EventLineMarkerProvider extends RelatedItemLineMarkerProvider {
         boolean isInsideUpdateFile = element.getContainingFile().getName().contains("Update");
 
         if (isDeclaration || isInsideUpdateFile) {
-            result.add(NavigationGutterIconBuilder.create(AllIcons.Actions.Find)
-                    .setTargets(NotNullLazyValue.lazy(() ->
-                            EventEmissionSearcher.findEmissions(targetClass, scope)))
-                    .setTooltipText("Go to emission")
-                    .setEmptyPopupText("No emissions found")
-                    .setTargetRenderer(() -> new PsiTargetPresentationRenderer<PsiElement>() {
-                        @Override
-                        public TargetPresentation getPresentation(@NotNull PsiElement element) {
-                            return ContextPresentationProvider.getPresentation(element);
-                        }
-                    })
-                    .createLineMarkerInfo(element));
+            result.add(createMarker(element, targetClass, PluginIcons.EMISSION, "Emission", EventEmissionSearcher::findEmissions));
         }
-
 
         if (!isInsideUpdateFile || isDeclaration) {
-            result.add(NavigationGutterIconBuilder.create(AllIcons.Actions.Execute)
-                    .setTargets(NotNullLazyValue.lazy(() ->
-                            EventProcessingSearcher.findProcessing(targetClass, scope)))
-                    .setTooltipText("Go to processing")
-                    .setEmptyPopupText("No processing found")
-                    .setTargetRenderer(() -> new PsiTargetPresentationRenderer<PsiElement>() {
-                        @Override
-                        public TargetPresentation getPresentation(@NotNull PsiElement element) {
-                            return ContextPresentationProvider.getPresentation(element);
-                        }
-                    })
-                    .createLineMarkerInfo(element));
+            result.add(createMarker(element, targetClass, PluginIcons.PROCESSING, "Processing", EventProcessingSearcher::findProcessing));
         }
+    }
+
+    private RelatedItemLineMarkerInfo<PsiElement> createMarker(PsiElement element, KtClassOrObject targetClass, Icon icon,
+            String title, BiFunction<KtClassOrObject, GlobalSearchScope, List<PsiElement>> searchFunc) {
+
+        GutterIconNavigationHandler<PsiElement> navHandler = (mouseEvent, elt) -> {
+            Editor editor = FileEditorManager.getInstance(elt.getProject()).getSelectedTextEditor();
+            if (editor == null) return;
+
+            // варианты Scope
+            Map<String, GlobalSearchScope> scopes = new LinkedHashMap<>();
+            scopes.put("Production", ScopeBuilder.getProductionScope(elt));
+            scopes.put("Test", ScopeBuilder.getTestScope(elt));
+            scopes.put("Module", ScopeBuilder.getModuleScope(elt));
+
+            String[] scopeNames = scopes.keySet().toArray(new String[0]);
+
+            // выбор Scope
+            JBPopupFactory.getInstance()
+                    .createListPopup(new BaseListPopupStep<String>("Select Scope for " + title, scopeNames) {
+                        @Override
+                        public @Nullable PopupStep<?> onChosen(String selectedValue, boolean finalChoice) {
+                            return doFinalStep(() -> {
+
+                                // запуск поиска
+                                GlobalSearchScope scope = scopes.get(selectedValue);
+                                List<PsiElement> targets = searchFunc.apply(targetClass, scope);
+
+                                // навигация
+
+                                if (targets.isEmpty()) {
+                                    HintManager.getInstance().showInformationHint(editor, "No " + title.toLowerCase() + " found in " + selectedValue);
+                                    return;
+                                }
+
+                                if (targets.size() == 1) {
+                                    ((Navigatable) targets.getFirst()).navigate(true);
+                                } else {
+                                    new PsiTargetNavigator<>(targets)
+                                            .presentationProvider(ContextPresentationProvider::getPresentation)
+                                            .createPopup(elt.getProject(), "Go to " + title)
+                                            .show(new RelativePoint(mouseEvent));
+                                }
+                            });
+                        }
+                    }).show(new RelativePoint(mouseEvent));
+        };
+
+        return new RelatedItemLineMarkerInfo<>(element, element.getTextRange(), icon, elt -> "Go to " + title, navHandler,
+                GutterIconRenderer.Alignment.RIGHT, () -> List.of());
     }
 }
