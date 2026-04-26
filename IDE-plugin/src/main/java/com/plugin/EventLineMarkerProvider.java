@@ -102,6 +102,7 @@ public class EventLineMarkerProvider extends RelatedItemLineMarkerProvider {
                                 GlobalSearchScope scope = scopes.get(selectedValue);
                                 List<PsiElement> targets = searchFunc.apply(targetClass, scope);
 
+                                createLog("Go to " + title, element.getProject().getName());
                                 // навигация
 
                                 if (targets.isEmpty()) {
@@ -123,8 +124,6 @@ public class EventLineMarkerProvider extends RelatedItemLineMarkerProvider {
                                             .show(new RelativePoint(mouseEvent));
 
                                 }
-
-                                createLog("Go to " + title, element.getProject().getName());
                             });
                         }
                     }).show(new RelativePoint(mouseEvent));
