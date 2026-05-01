@@ -3,22 +3,13 @@ package com.plugin;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider;
-import com.intellij.codeInsight.hint.HintManager;
-import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder;
 import com.intellij.codeInsight.navigation.PsiTargetNavigator;
-import com.intellij.codeInsight.navigation.impl.PsiTargetPresentationRenderer;
-import com.intellij.icons.AllIcons;
-import javax.swing.Icon;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.ui.MessageType;
 import com.intellij.openapi.ui.popup.Balloon;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
-import com.intellij.openapi.ui.popup.PopupStep;
-import com.intellij.openapi.ui.popup.util.BaseListPopupStep;
-import com.intellij.openapi.util.NotNullLazyValue;
-import com.intellij.platform.backend.presentation.TargetPresentation;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.impl.source.tree.LeafPsiElement;
@@ -26,13 +17,10 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.ui.awt.RelativePoint;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.psi.*;
-import com.intellij.psi.PsiReference;
 
-
+import javax.swing.*;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -48,11 +36,13 @@ public class EventLineMarkerProvider extends RelatedItemLineMarkerProvider {
         PsiElement parent = element.getParent();
         if (parent instanceof KtNameReferenceExpression) {
             PsiElement grandParent = parent.getParent();
-            if (grandParent instanceof KtDotQualifiedExpression && ((KtDotQualifiedExpression) grandParent).getReceiverExpression() == parent) return;
+            if (grandParent instanceof KtDotQualifiedExpression && ((KtDotQualifiedExpression) grandParent).getReceiverExpression() == parent)
+                return;
 
             if (grandParent instanceof KtUserType) {
                 PsiElement greatGrandParent = grandParent.getParent();
-                if (greatGrandParent instanceof KtUserType && ((KtUserType) greatGrandParent).getQualifier() == grandParent) return;
+                if (greatGrandParent instanceof KtUserType && ((KtUserType) greatGrandParent).getQualifier() == grandParent)
+                    return;
             }
         }
 
@@ -77,56 +67,40 @@ public class EventLineMarkerProvider extends RelatedItemLineMarkerProvider {
     }
 
     private RelatedItemLineMarkerInfo<PsiElement> createMarker(PsiElement element, KtClassOrObject targetClass, Icon icon,
-            String title, BiFunction<KtClassOrObject, GlobalSearchScope, List<PsiElement>> searchFunc) {
+                                                               String title, BiFunction<KtClassOrObject, GlobalSearchScope, List<PsiElement>> searchFunc) {
 
         GutterIconNavigationHandler<PsiElement> navHandler = (mouseEvent, elt) -> {
             Editor editor = FileEditorManager.getInstance(elt.getProject()).getSelectedTextEditor();
             if (editor == null) return;
 
-            // варианты Scope
-            Map<String, GlobalSearchScope> scopes = new LinkedHashMap<>();
-            scopes.put("Production", ScopeBuilder.getProductionScope(elt));
-            scopes.put("Test", ScopeBuilder.getTestScope(elt));
-            scopes.put("Module", ScopeBuilder.getModuleScope(elt));
+            GlobalSearchScope moduleScope = ScopeBuilder.getModuleScope(elt);
+            List<PsiElement> targets = searchFunc.apply(targetClass, moduleScope);
 
-            String[] scopeNames = scopes.keySet().toArray(new String[0]);
+            if (targets == null || targets.isEmpty()) {
+                GlobalSearchScope projectScope = ScopeBuilder.getProductionScope(elt);
+                targets = searchFunc.apply(targetClass, projectScope);
+            }
+            createLog("Go to " + title, element.getProject().getName());
 
-            // выбор Scope
-            JBPopupFactory.getInstance()
-                    .createListPopup(new BaseListPopupStep<String>("Select Scope for " + title, scopeNames) {
-                        @Override
-                        public @Nullable PopupStep<?> onChosen(String selectedValue, boolean finalChoice) {
-                            return doFinalStep(() -> {
+            if (targets.isEmpty()) {
+                JBPopupFactory.getInstance()
+                        .createHtmlTextBalloonBuilder("Not found for " + title, MessageType.INFO, null)
+                        .setFadeoutTime(3000) // Исчезнет через 3 секунды
+                        .createBalloon()
+                        .show(new RelativePoint(mouseEvent), Balloon.Position.atRight);
+                return;
+            }
 
-                                // запуск поиска
-                                GlobalSearchScope scope = scopes.get(selectedValue);
-                                List<PsiElement> targets = searchFunc.apply(targetClass, scope);
+            if (targets.size() == 1) {
+                ((Navigatable) targets.getFirst()).navigate(true);
+            } else {
+                new PsiTargetNavigator<>(targets)
+                        .presentationProvider(ContextPresentationProvider::getPresentation)
+                        .createPopup(elt.getProject(), "Go to " + title)
+                        .show(new RelativePoint(mouseEvent));
 
-                                createLog("Go to " + title, element.getProject().getName());
-                                // навигация
+            }
 
-                                if (targets.isEmpty()) {
-//                                    HintManager.getInstance().showInformationHint(editor, "No " + title.toLowerCase() + " found in " + selectedValue);
-                                    JBPopupFactory.getInstance()
-                                            .createHtmlTextBalloonBuilder("Not found for " + title, MessageType.INFO, null)
-                                            .setFadeoutTime(3000) // Исчезнет через 3 секунды
-                                            .createBalloon()
-                                            .show(new RelativePoint(mouseEvent), Balloon.Position.atRight);
-                                    return;
-                                }
-
-                                if (targets.size() == 1) {
-                                    ((Navigatable) targets.getFirst()).navigate(true);
-                                } else {
-                                    new PsiTargetNavigator<>(targets)
-                                            .presentationProvider(ContextPresentationProvider::getPresentation)
-                                            .createPopup(elt.getProject(), "Go to " + title)
-                                            .show(new RelativePoint(mouseEvent));
-
-                                }
-                            });
-                        }
-                    }).show(new RelativePoint(mouseEvent));
         };
 
         return new RelatedItemLineMarkerInfo<>(element, element.getTextRange(), icon, elt -> "Go to " + title, navHandler,
