@@ -175,7 +175,7 @@ public class CommandLineMarkerProvider extends RelatedItemLineMarkerProvider {
         for (PsiClass superClass : psiClass.getSupers()) {
             String name = superClass.getName();
 
-            if (name != null && name.contains("Command") && !name.contains("CommandsFlowHandler")) return true;
+            if (name != null && name.contains("Command") && !name.contains("Handler")) return true;
         }
 
         return false;
