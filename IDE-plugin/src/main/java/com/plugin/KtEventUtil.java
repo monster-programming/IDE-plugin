@@ -22,7 +22,15 @@ public class KtEventUtil {
         if (name.endsWith("Event")) return true;
 
         KtSuperTypeList superTypeList = ktClass.getSuperTypeList();
-        if (superTypeList != null && superTypeList.getText().contains("Event")) return true;
+        if (superTypeList != null) {
+            for (KtSuperTypeListEntry entry : superTypeList.getEntries()) {
+                KtTypeReference typeRef = entry.getTypeReference();
+                if (typeRef != null && typeRef.getTypeElement() instanceof KtUserType userType) {
+                    String baseName = userType.getReferencedName();
+                    if (baseName != null && baseName.endsWith("Event")) return true;
+                }
+            }
+        }
 
         KtClassOrObject parent = PsiTreeUtil.getParentOfType(ktClass, KtClassOrObject.class);
         return parent != null && parent.getName() != null && parent.getName().endsWith("Event");

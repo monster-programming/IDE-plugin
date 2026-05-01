@@ -8,6 +8,8 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 
 import com.intellij.openapi.editor.Editor;
@@ -58,25 +60,29 @@ public class BaseAction extends AnAction {
     }
 
     private void executeSearch(Editor e, PsiElement targetClass, GlobalSearchScope scope) {
-        List<PsiElement> targets = findTargets(targetClass, scope);
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            List<PsiElement> targets = ReadAction.compute(() -> findTargets(targetClass, scope));
 
-        createLog(targetClass.getProject().getName());
+            ApplicationManager.getApplication().invokeLater(() -> {
+                createLog(targetClass.getProject().getName());
 
-        if (targets.isEmpty()) {
-            String message = "No " + getOperation().toLowerCase() + " usages found.";
-            HintManager.getInstance().showInformationHint(e, message);
-            return;
-        }
+                if (targets.isEmpty()) {
+                    String message = "No " + getOperation().toLowerCase() + " usages found.";
+                    HintManager.getInstance().showInformationHint(e, message);
+                    return;
+                }
 
-        if (targets.size() == 1) {
-            ((Navigatable) targets.getFirst()).navigate(true);
-        }
-        else {
-            new PsiTargetNavigator<>(targets)
-                    .presentationProvider(ContextPresentationProvider::getPresentation)
-                    .createPopup(e.getProject(), getTitle())
-                    .showInBestPositionFor(e);
-        }
+                if (targets.size() == 1) {
+                    ((Navigatable) targets.getFirst()).navigate(true);
+                }
+                else {
+                    new PsiTargetNavigator<>(targets)
+                            .presentationProvider(ContextPresentationProvider::getPresentation)
+                            .createPopup(e.getProject(), getTitle())
+                            .showInBestPositionFor(e);
+                }
+            });
+        });
     }
 
 
