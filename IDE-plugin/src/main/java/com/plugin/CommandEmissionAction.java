@@ -38,7 +38,7 @@ public class CommandEmissionAction extends BaseAction {
 
     @Override
     protected PsiElement findTargetClass(PsiElement element) {
-        UElement uElement = UastContextKt.toUElement(element);
+        UElement uElement = UastContextKt.toUElement(element, UElement.class);
         UClass uClass = null;
 
         if (uElement instanceof UMethod method && method.isConstructor()) {

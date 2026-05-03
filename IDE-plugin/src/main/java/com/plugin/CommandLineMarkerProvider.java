@@ -3,6 +3,9 @@ package com.plugin;
 import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider;
+import com.intellij.codeInsight.navigation.PsiTargetNavigator;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -21,6 +24,8 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.uast.*;
 
 import javax.swing.*;
+import javax.swing.text.Element;
+import java.awt.event.MouseEvent;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +37,7 @@ public class CommandLineMarkerProvider extends RelatedItemLineMarkerProvider {
     @Override
     protected void collectNavigationMarkers(@NotNull PsiElement element,
                                             @NotNull Collection<? super RelatedItemLineMarkerInfo<?>> result) {
+
         addClassMarker(element, result);
         addConstructorCallMarker(element, result);
         addObjectMarker(element, result);
@@ -50,7 +56,7 @@ public class CommandLineMarkerProvider extends RelatedItemLineMarkerProvider {
         if (isCommand(psiClass)) {
 
             PsiElement identifier = psiClass.getNameIdentifier();
-            if (identifier == null) identifier = element;
+            if (identifier == null) return;
 
            RelatedItemLineMarkerInfo<PsiElement> emissionMarker = getMarker(identifier, psiClass, PluginIcons.EMISSION, " Go to Emission", CommandEmissionSearcher::findEmission);
            result.add(emissionMarker);
@@ -61,7 +67,7 @@ public class CommandLineMarkerProvider extends RelatedItemLineMarkerProvider {
     }
 
     private void addConstructorCallMarker(PsiElement element, Collection<? super RelatedItemLineMarkerInfo<?>> result) {
-        UElement uElement = UastContextKt.toUElement(element);
+        UElement uElement = UastContextKt.toUElement(element, UElement.class);
         if (!(uElement instanceof UCallExpression callExpression)) return;
         PsiMethod constructor = callExpression.resolve();
         if (constructor != null && constructor.isConstructor()) {
@@ -77,7 +83,7 @@ public class CommandLineMarkerProvider extends RelatedItemLineMarkerProvider {
     }
 
     private void addObjectMarker(PsiElement element, Collection<? super RelatedItemLineMarkerInfo<?>> result) {
-        UElement uElement = UastContextKt.toUElement(element);
+        UElement uElement = UastContextKt.toUElement(element, UElement.class);
         if (uElement instanceof USimpleNameReferenceExpression ref) {
             UElement parent = uElement.getUastParent();
             if (parent == null) return;
@@ -96,7 +102,7 @@ public class CommandLineMarkerProvider extends RelatedItemLineMarkerProvider {
     }
 
     private void addInHandle(PsiElement element, Collection<? super RelatedItemLineMarkerInfo<?>> result) {
-        UElement uElement = UastContextKt.toUElement(element);
+        UElement uElement = UastContextKt.toUElement(element, UElement.class);
 
         if (!(uElement instanceof USimpleNameReferenceExpression ref)) return;
 
@@ -119,15 +125,24 @@ public class CommandLineMarkerProvider extends RelatedItemLineMarkerProvider {
             Editor e = FileEditorManager.getInstance(element1.getProject()).getSelectedTextEditor();
             if (e != null) {
                 RelativePoint point = new RelativePoint(mouseEvent);
+                String project = element.getProject().getName();
 
-                UClass uClass = UastContextKt.toUElement(targetCommand, UClass.class);
-                List<PsiElement> targets = searchFunc.apply(uClass, ScopeBuilder.getModuleScope(element));
+                ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                    List<PsiElement> targets = ReadAction.compute(() -> {
+                        UClass uClass = UastContextKt.toUElement(targetCommand, UClass.class);
+                        List<PsiElement> result = searchFunc.apply(uClass, ScopeBuilder.getModuleScope(element));
 
-                if (targets.isEmpty()) targets = searchFunc.apply(uClass, ScopeBuilder.getProductionScope(element));
+                        if (result.isEmpty()) result = searchFunc.apply(uClass, ScopeBuilder.getProductionScope(element));
 
-                createLog(title, element.getProject().getName());
+                        return result;
+                    });
 
-                navigation(e, targets, title, point);
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        createLog(title, project);
+
+                        navigation(targets, title, point, mouseEvent, element1);
+                    });
+                });
             }
         });
 
@@ -142,7 +157,7 @@ public class CommandLineMarkerProvider extends RelatedItemLineMarkerProvider {
         );
     }
 
-    private void navigation(Editor e, List<PsiElement> targets, String title, RelativePoint point) {
+    private void navigation(List<PsiElement> targets, String title, RelativePoint point, MouseEvent mouseEvent, PsiElement elt) {
         if (targets.isEmpty()) {
             JBPopupFactory.getInstance()
                     .createHtmlTextBalloonBuilder("Not found for " + title, MessageType.INFO, null)
@@ -156,18 +171,10 @@ public class CommandLineMarkerProvider extends RelatedItemLineMarkerProvider {
             ((Navigatable) targets.getFirst()).navigate(true);
         }
         else {
-            JBPopup popup = JBPopupFactory.getInstance()
-                    .createPopupChooserBuilder(targets)
-                    .setTitle(title)
-                    .setRenderer(ContextPresentationProvider.createCellRender())
-                    .setItemChosenCallback(target -> {
-                        if (target instanceof Navigatable navigatable) {
-                            navigatable.navigate(true);
-                        }
-                    })
-                    .createPopup();
-
-            popup.show(point);
+            new PsiTargetNavigator<>(targets)
+                    .presentationProvider(ContextPresentationProvider::getPresentation)
+                    .createPopup(elt.getProject(), "Go to " + title)
+                    .show(new RelativePoint(mouseEvent));
         }
     }
 

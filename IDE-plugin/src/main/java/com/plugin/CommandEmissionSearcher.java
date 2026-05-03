@@ -38,7 +38,7 @@ public class CommandEmissionSearcher {
                 .forEach(usage -> {
                     PsiElement element = usage.getElement();
 
-                    UElement uElement = UastContextKt.toUElement(element);
+                    UElement uElement = UastContextKt.toUElement(element, UElement.class);
                     if (uElement == null) return true;
 
                     // 1. Пропускаем импорты

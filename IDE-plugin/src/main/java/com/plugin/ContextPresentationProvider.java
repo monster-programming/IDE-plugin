@@ -47,29 +47,4 @@ public class ContextPresentationProvider {
                 .icon(file != null ? file.getIcon(0) : null)
                 .presentation();
     }
-
-    public static ListCellRenderer<? super PsiElement> createCellRender() {
-        return new PsiElementListCellRenderer<>() {
-            @Override
-            public @NlsSafe String getElementText(PsiElement element) {
-                return getPresentation(element).getPresentableText();
-            }
-
-            @Override
-            protected @Nullable @NlsSafe String getContainerText(PsiElement element, String s) {
-                return null;
-            }
-
-            @Override
-            protected int getIconFlags() {
-                return 0;
-            }
-
-            @Override
-            protected Icon getIcon(PsiElement element) {
-                // Берем иконку из презентации
-                return getPresentation(element).getIcon();
-            }
-        };
-    }
 }

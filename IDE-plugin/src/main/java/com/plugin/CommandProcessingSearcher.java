@@ -34,7 +34,7 @@ public class CommandProcessingSearcher {
                 .forEach(usage -> {
                     PsiElement element = usage.getElement();
 
-                    UElement uElement = UastContextKt.toUElement(element);
+                    UElement uElement = UastContextKt.toUElement(element, UElement.class);
                     if (uElement == null) return false;
 
                     UClass handlerClass = UastUtils.getParentOfType(uElement, UClass.class);
